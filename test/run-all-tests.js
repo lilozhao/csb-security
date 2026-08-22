@@ -13,7 +13,10 @@ const tests = [
   { name: 'aid.js (Layer 1 身份)', file: 'test-aid.js' },
   { name: 'aat.js (Layer 1 身份)', file: 'test-aat.js' },
   { name: 'key-rotation.js (Layer 1 密钥轮换)', file: 'test-key-rotation.js' },
-  { name: 'trust-level.js (Layer 2 信任等级)', file: 'test-trust-level.js' }
+  { name: 'trust-level.js (Layer 2 信任等级)', file: 'test-trust-level.js' },
+  { name: 'uac.js (Layer 2 用户授权凭证)', file: 'test-uac.js' },
+  { name: 'scope-intersection.js (Layer 2 权限交集)', file: 'test-scope-intersection.js' },
+  { name: 'handshake.js (五步握手)', file: 'test-handshake.js' }
 ];
 
 async function runAllTests() {

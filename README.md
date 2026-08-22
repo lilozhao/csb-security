@@ -10,7 +10,7 @@
 | 里程碑 | 内容 | 状态 |
 |--------|------|------|
 | **M1 (P0)** | Layer 1 身份（AID + AAT + 密钥轮换）+ 信任等级收编 | ✅ 完成 2026-08-22 · 39 用例 100% |
-| M2 (P1) | 五步握手 + 权限交集 + UAC | ⬜ |
+| **M2 (P1)** | 五步握手 + 权限交集 + UAC | ✅ 完成 2026-08-22 · 72 用例 100% |
 | M3 (P2) | 会话密钥协商 + Token 绑定 | ⬜ |
 | M4 (P2) | 哈希链审计 + 重放防护 + 限流 | ⬜ |
 | M5 (P3) | 异常检测 + 集成 csb-a2a-aip | ⬜ |
@@ -60,8 +60,12 @@ lib/
 │   ├── aid.js          AID 文档生成/签名/验证（Ed25519）
 │   ├── aat.js          AAT 签发/验证（JWT + EdDSA + jti 防重放）
 │   └── key-rotation.js 密钥轮换 + AID 缓存（TTL 5min，refetch 限流 1/min）
-├── authz/              Layer 2: 授权控制（M1 部分）
-│   └── trust-level.js  L0-L3 信任等级（收编自 A2A-010 trust-manager.js）
+├── authz/              Layer 2: 授权控制
+│   ├── trust-level.js  L0-L3 信任等级（收编自 A2A-010 trust-manager.js）
+│   ├── uac.js          用户授权凭证（签发/验证 + restrictions）
+│   └── scope-intersection.js  权限交集（granted/denied + 原因）
+├── handshake/          五步对等握手
+│   └── handshake.js    init→challenge→proof→approval→complete + 渐进式等级
 └── index.js            统一入口
 test/                   测试（node test/run-all-tests.js）
 examples/               使用示例
@@ -74,6 +78,10 @@ protocol/               协议文档副本
 - **AAT**：JWT 三段式，exp 必须存在，iat 偏差 ≤ 5 分钟，jti 防重放（协议 §2.2）
 - **密钥轮换**：AID 缓存 TTL ≤ 5 分钟；验证失败强制重新获取，限流 1 次/分钟/Agent（协议 §2.3/2.4）
 - **信任等级**：L0→L1 需身份验证；L1→L2 需 ≥10 次正向无负向；L2→L3 需用户授权 + 声誉 ≥0.9（协议 §3.4）
+- **UAC**：用户签发 JWT，sub 绑定 Agent（Token 绑定），scopes + restrictions（allowed_agents/rate_limit），时间窗口常量（协议 §3.2）
+- **权限交集**：effective = UAC scopes ∩ callee scopes，交集为空不得发放，拒绝带原因（user_policy/callee_policy）（协议 §3.3）
+- **五步握手**：init→challenge→proof→approval→complete，双向 nonce 签名验证，AAT+UAC 双重校验，时间戳偏差 >5min 拒绝，nonce 重放防护（协议 §7）
+- **渐进式等级**：L0 无握手 / L1 到 approval / L2 完整 + complete / L3 用户实时确认（协议 §7.7）
 
 ## 收编来源
 
