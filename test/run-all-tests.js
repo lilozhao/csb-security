@@ -20,7 +20,10 @@ const tests = [
   { name: 'e2e-encryption.js (Layer 3 加密)', file: 'test-e2e-encryption.js' },
   { name: 'session-keys.js (Layer 3 会话密钥)', file: 'test-session-keys.js' },
   { name: 'token-binding.js (Layer 3 Token 绑定)', file: 'test-token-binding.js' },
-  { name: 'pkce.js (Layer 3 PKCE)', file: 'test-pkce.js' }
+  { name: 'pkce.js (Layer 3 PKCE)', file: 'test-pkce.js' },
+  { name: 'audit-log.js (Layer 5 哈希链审计)', file: 'test-audit-log.js' },
+  { name: 'replay-guard.js (Layer 4 重放防护)', file: 'test-replay-guard.js' },
+  { name: 'rate-limiter.js (Layer 4 限流+异常检测)', file: 'test-rate-limiter.js' }
 ];
 
 async function runAllTests() {

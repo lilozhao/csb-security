@@ -12,7 +12,7 @@
 | **M1 (P0)** | Layer 1 身份（AID + AAT + 密钥轮换）+ 信任等级收编 | ✅ 完成 2026-08-22 · 39 用例 100% |
 | **M2 (P1)** | 五步握手 + 权限交集 + UAC | ✅ 完成 2026-08-22 · 72 用例 100% |
 | **M3 (P2)** | 会话密钥协商（ECDH）+ Token 绑定 + PKCE | ✅ 完成 2026-08-22 · 105 用例 100% |
-| M4 (P2) | 哈希链审计 + 重放防护 + 限流 | ⬜ |
+| **M4 (P2)** | 哈希链审计 + 重放防护 + 限流 | ✅ 完成 2026-08-22 · 131 用例 100% |
 | M5 (P3) | 异常检测 + 集成 csb-a2a-aip | ⬜ |
 
 ## 快速开始
@@ -71,6 +71,12 @@ lib/
 │   ├── session-keys.js    ECDH-P256 双向密钥协商（协议 §4.2）
 │   ├── token-binding.js   Token 绑定元组 (caller,user,callee,scopes)（协议 §4.3）
 │   └── pkce.js            PKCE S256（协议 §4.4 / RFC 7636）
+├── defense/             Layer 4: 防攻击
+│   ├── replay-guard.js    Nonce/jti/时间戳/序列号重放防护（协议 §5.1）
+│   └── rate-limiter.js    单 Agent 60 + 单 IP 200 + 全局 1000/min + 异常暂停（协议 §5.3）
+├── audit/               Layer 5: 审计追踪
+│   ├── audit-log.js       追加写 + 哈希链（prev_hash）+ Ed25519 签名 + 篡改检测（协议 §6.2）
+│   └── audit-query.js     按 Agent/事件/时间/scope 查询 + 轨迹（协议 §6.3）
 └── index.js            统一入口
 test/                   测试（node test/run-all-tests.js）
 examples/               使用示例
@@ -91,6 +97,9 @@ protocol/               协议文档副本
 - **Token 绑定**：token_bound_to=(caller,user,callee,scopes)，任一变化失效，timing-safe 比较（协议 §4.3）
 - **PKCE**：S256 challenge（RFC 7636 附录 B 验证），state ≥128 位熵（协议 §4.4）
 - **E2E 加密**：AES-256-GCM 认证加密，HKDF 密钥派生按 Agent 隔离，支持 PSK（收编）与 ECDH 会话密钥（协议 §4）
+- **重放防护**：Nonce/jti 缓存 + 时间戳偏差 >5min 拒绝 + 序列号单调递增（协议 §5.1）
+- **速率限制**：单 Agent 60/min · 单 IP 200/min · 全局 1000/min（滑动窗口）；连续 10 次失败自动暂停 1 分钟；同 IP 多 Agent 标记可疑（协议 §5.3）
+- **审计日志**：追加写 + 哈希链（prev_hash=SHA256 前一条）+ 每条 Ed25519 签名，篡改/断链/伪签必检出；支持文件落盘重载（协议 §6.2）
 
 ## 收编来源
 
