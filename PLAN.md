@@ -133,7 +133,7 @@ csb-security/
 
 **csb-a2a-aip 集成进度（A+C 方案：optionalDependencies file: 依赖 + 降级加载）**：
 - ✅ **Phase 1 等价替换（2026-08-22，commit 62a2f34）**：security-adapter.js + trust/e2e 换源 csb-security；回归 test-v4-full 10/10 + test-v4-compat 3/3 + test-v4 集成全过；五平台已推
-- ⬜ Phase 2 增强替换（rate-limiter 按 Agent 限流 + audit 哈希链，feature flag）
+- ✅ **Phase 2 增强替换（2026-08-22，commit a433287）**：限流双模式（check 按 Agent+IP+全局 / allow 降级）+ 按 Agent 独立配额（修复 legacy 同 IP 误伤）+ 哈希链审计工厂（A2A_SECURITY_AUDIT=1 落盘 data/audit/）；行为一致性验证（均第 61 次拦截）；五平台已推
 - ⬜ Phase 3 新能力（/a2a/handshake 端点 + anomaly-detector 中间件）
 
 **验收标准**（对标 csb-memory v1.1 的 110+ 用例）：
