@@ -23,7 +23,8 @@ const tests = [
   { name: 'pkce.js (Layer 3 PKCE)', file: 'test-pkce.js' },
   { name: 'audit-log.js (Layer 5 哈希链审计)', file: 'test-audit-log.js' },
   { name: 'replay-guard.js (Layer 4 重放防护)', file: 'test-replay-guard.js' },
-  { name: 'rate-limiter.js (Layer 4 限流+异常检测)', file: 'test-rate-limiter.js' }
+  { name: 'rate-limiter.js (Layer 4 限流+异常检测)', file: 'test-rate-limiter.js' },
+  { name: 'anomaly-detector.js (Layer 4 异常检测)', file: 'test-anomaly-detector.js' }
 ];
 
 async function runAllTests() {
