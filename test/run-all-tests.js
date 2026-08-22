@@ -16,7 +16,11 @@ const tests = [
   { name: 'trust-level.js (Layer 2 信任等级)', file: 'test-trust-level.js' },
   { name: 'uac.js (Layer 2 用户授权凭证)', file: 'test-uac.js' },
   { name: 'scope-intersection.js (Layer 2 权限交集)', file: 'test-scope-intersection.js' },
-  { name: 'handshake.js (五步握手)', file: 'test-handshake.js' }
+  { name: 'handshake.js (五步握手)', file: 'test-handshake.js' },
+  { name: 'e2e-encryption.js (Layer 3 加密)', file: 'test-e2e-encryption.js' },
+  { name: 'session-keys.js (Layer 3 会话密钥)', file: 'test-session-keys.js' },
+  { name: 'token-binding.js (Layer 3 Token 绑定)', file: 'test-token-binding.js' },
+  { name: 'pkce.js (Layer 3 PKCE)', file: 'test-pkce.js' }
 ];
 
 async function runAllTests() {

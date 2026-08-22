@@ -11,7 +11,7 @@
 |--------|------|------|
 | **M1 (P0)** | Layer 1 身份（AID + AAT + 密钥轮换）+ 信任等级收编 | ✅ 完成 2026-08-22 · 39 用例 100% |
 | **M2 (P1)** | 五步握手 + 权限交集 + UAC | ✅ 完成 2026-08-22 · 72 用例 100% |
-| M3 (P2) | 会话密钥协商 + Token 绑定 | ⬜ |
+| **M3 (P2)** | 会话密钥协商（ECDH）+ Token 绑定 + PKCE | ✅ 完成 2026-08-22 · 105 用例 100% |
 | M4 (P2) | 哈希链审计 + 重放防护 + 限流 | ⬜ |
 | M5 (P3) | 异常检测 + 集成 csb-a2a-aip | ⬜ |
 
@@ -66,6 +66,11 @@ lib/
 │   └── scope-intersection.js  权限交集（granted/denied + 原因）
 ├── handshake/          五步对等握手
 │   └── handshake.js    init→challenge→proof→approval→complete + 渐进式等级
+├── transport/           Layer 3: 传输安全
+│   ├── e2e-encryption.js  AES-256-GCM + HKDF（收编自 A2A-021，PSK + ECDH 密钥）
+│   ├── session-keys.js    ECDH-P256 双向密钥协商（协议 §4.2）
+│   ├── token-binding.js   Token 绑定元组 (caller,user,callee,scopes)（协议 §4.3）
+│   └── pkce.js            PKCE S256（协议 §4.4 / RFC 7636）
 └── index.js            统一入口
 test/                   测试（node test/run-all-tests.js）
 examples/               使用示例
@@ -82,6 +87,10 @@ protocol/               协议文档副本
 - **权限交集**：effective = UAC scopes ∩ callee scopes，交集为空不得发放，拒绝带原因（user_policy/callee_policy）（协议 §3.3）
 - **五步握手**：init→challenge→proof→approval→complete，双向 nonce 签名验证，AAT+UAC 双重校验，时间戳偏差 >5min 拒绝，nonce 重放防护（协议 §7）
 - **渐进式等级**：L0 无握手 / L1 到 approval / L2 完整 + complete / L3 用户实时确认（协议 §7.7）
+- **会话密钥**：ECDH-P256 双向协商，HKDF-SHA256 派生（info="csb-session-key"），sign(nonce) 双向验证，nonce 重放防护（协议 §4.2）
+- **Token 绑定**：token_bound_to=(caller,user,callee,scopes)，任一变化失效，timing-safe 比较（协议 §4.3）
+- **PKCE**：S256 challenge（RFC 7636 附录 B 验证），state ≥128 位熵（协议 §4.4）
+- **E2E 加密**：AES-256-GCM 认证加密，HKDF 密钥派生按 Agent 隔离，支持 PSK（收编）与 ECDH 会话密钥（协议 §4）
 
 ## 收编来源
 
