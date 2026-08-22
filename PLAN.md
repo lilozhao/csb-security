@@ -134,7 +134,8 @@ csb-security/
 **csb-a2a-aip 集成进度（A+C 方案：optionalDependencies file: 依赖 + 降级加载）**：
 - ✅ **Phase 1 等价替换（2026-08-22，commit 62a2f34）**：security-adapter.js + trust/e2e 换源 csb-security；回归 test-v4-full 10/10 + test-v4-compat 3/3 + test-v4 集成全过；五平台已推
 - ✅ **Phase 2 增强替换（2026-08-22，commit a433287）**：限流双模式（check 按 Agent+IP+全局 / allow 降级）+ 按 Agent 独立配额（修复 legacy 同 IP 误伤）+ 哈希链审计工厂（A2A_SECURITY_AUDIT=1 落盘 data/audit/）；行为一致性验证（均第 61 次拦截）；五平台已推
-- ⬜ Phase 3 新能力（/a2a/handshake 端点 + anomaly-detector 中间件）
+- ✅ **Phase 3 新能力（2026-08-22，commit 8bdb7d8）**：/a2a/handshake 对等握手端点（五步、L0-L3，密钥就绪才启用）+ 异常检测中间件（限流拒绝→failure/成功→success，告警→console+飞书 webhook）；端到端验证五步握手全通 + 篡改 nonce→401 + 告警触发暂停；集成文档 UPGRADE-SECURITY-INTEGRATION.md；五平台已推
+- 🎉 **集成全部完成（Phase 1-3）**：csb-security 五层安全架构全面进入 A2A 服务，全部可降级
 
 **验收标准**（对标 csb-memory v1.1 的 110+ 用例）：
 - 总测试用例 ≥ 90，通过率 100%
