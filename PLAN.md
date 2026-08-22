@@ -129,7 +129,12 @@ csb-security/
 **M5 完成情况（2026-08-22）**：`lib/defense/anomaly-detector.js` 规则引擎落地
 - 五条可配置规则：① 连续失败→暂停+告警 ② 同 IP 多 Agent→可疑 ③ 高频 AID 注册→告警 ④ 密钥轮换异常→告警 ⑤ 审计篡改→critical 单次触发
 - 统一告警通道（onAlert 回调 + 告警历史）+ suspendFn 动作注入 + 滑动窗口
-- 14 用例 100%（累计 145）；**csb-a2a-aip 集成（Phase 1-3）待排期**（集成方式已定：file: 依赖 + 降级加载）
+- 14 用例 100%（累计 145）
+
+**csb-a2a-aip 集成进度（A+C 方案：optionalDependencies file: 依赖 + 降级加载）**：
+- ✅ **Phase 1 等价替换（2026-08-22，commit 62a2f34）**：security-adapter.js + trust/e2e 换源 csb-security；回归 test-v4-full 10/10 + test-v4-compat 3/3 + test-v4 集成全过；五平台已推
+- ⬜ Phase 2 增强替换（rate-limiter 按 Agent 限流 + audit 哈希链，feature flag）
+- ⬜ Phase 3 新能力（/a2a/handshake 端点 + anomaly-detector 中间件）
 
 **验收标准**（对标 csb-memory v1.1 的 110+ 用例）：
 - 总测试用例 ≥ 90，通过率 100%
