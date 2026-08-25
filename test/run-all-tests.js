@@ -14,6 +14,7 @@ const tests = [
   { name: 'aat.js (Layer 1 身份)', file: 'test-aat.js' },
   { name: 'key-rotation.js (Layer 1 密钥轮换)', file: 'test-key-rotation.js' },
   { name: 'trust-level.js (Layer 2 信任等级)', file: 'test-trust-level.js' },
+  { name: 'reputation.js (Layer 2 声誉)', file: 'test-reputation.js' },
   { name: 'uac.js (Layer 2 用户授权凭证)', file: 'test-uac.js' },
   { name: 'scope-intersection.js (Layer 2 权限交集)', file: 'test-scope-intersection.js' },
   { name: 'handshake.js (五步握手)', file: 'test-handshake.js' },
@@ -22,6 +23,7 @@ const tests = [
   { name: 'token-binding.js (Layer 3 Token 绑定)', file: 'test-token-binding.js' },
   { name: 'pkce.js (Layer 3 PKCE)', file: 'test-pkce.js' },
   { name: 'audit-log.js (Layer 5 哈希链审计)', file: 'test-audit-log.js' },
+  { name: 'tamper-check.js (Layer 5 篡改校验)', file: 'test-tamper-check.js' },
   { name: 'replay-guard.js (Layer 4 重放防护)', file: 'test-replay-guard.js' },
   { name: 'rate-limiter.js (Layer 4 限流+异常检测)', file: 'test-rate-limiter.js' },
   { name: 'anomaly-detector.js (Layer 4 异常检测)', file: 'test-anomaly-detector.js' }
