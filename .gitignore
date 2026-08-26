@@ -1,5 +1,9 @@
 node_modules/
-data/
+data/raw/
+data/*-private-key.pem
+data/demo/private-key.pem
+data/*-key.pem
+**/*-private-key.pem
 *.log
 .DS_Store
 .env
