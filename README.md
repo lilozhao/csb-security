@@ -67,7 +67,8 @@ lib/
 ├── authz/              Layer 2: 授权控制
 │   ├── trust-level.js  L0-L3 信任等级（收编自 A2A-010 trust-manager.js）
 │   ├── uac.js          用户授权凭证（签发/验证 + restrictions）
-│   └── scope-intersection.js  权限交集（granted/denied + 原因）
+│   ├── scope-intersection.js  权限交集（granted/denied + 原因）
+│   └── reputation.js   声誉模块（信任升级依据，L2→L3 门槛 ≥0.9）
 ├── handshake/          五步对等握手
 │   └── handshake.js    init→challenge→proof→approval→complete + 渐进式等级
 ├── transport/           Layer 3: 传输安全
@@ -77,11 +78,15 @@ lib/
 │   └── pkce.js            PKCE S256（协议 §4.4 / RFC 7636）
 ├── defense/             Layer 4: 防攻击
 │   ├── replay-guard.js    Nonce/jti/时间戳/序列号重放防护（协议 §5.1）
-│   └── rate-limiter.js    单 Agent 60 + 单 IP 200 + 全局 1000/min + 异常暂停（协议 §5.3）
+│   ├── rate-limiter.js    单 Agent 60 + 单 IP 200 + 全局 1000/min + 异常暂停（协议 §5.3）
+│   └── anomaly-detector.js 异常检测规则引擎（M5：行为偏离识别）
 ├── audit/               Layer 5: 审计追踪
 │   ├── audit-log.js       追加写 + 哈希链（prev_hash）+ Ed25519 签名 + 篡改检测（协议 §6.2）
-│   └── audit-query.js     按 Agent/事件/时间/scope 查询 + 轨迹（协议 §6.3）
+│   ├── audit-query.js     按 Agent/事件/时间/scope 查询 + 轨迹（协议 §6.3）
+│   └── tamper-check.js    审计篡改校验（对账 + 断链定位）
 └── index.js            统一入口
+scripts/                实操脚本（handshake-full.js 对等握手 · rotate-keys.js 密钥轮换 · verify-handshake-*.js 验证）
+keys/                   公钥权威源（user-yilan.pubkey.json 等，仅公开公钥，私钥永不入库）
 test/                   测试（node test/run-all-tests.js）
 examples/               使用示例
 protocol/               协议文档副本
@@ -93,6 +98,7 @@ protocol/               协议文档副本
 - **AAT**：JWT 三段式，exp 必须存在，iat 偏差 ≤ 5 分钟，jti 防重放（协议 §2.2）
 - **密钥轮换**：AID 缓存 TTL ≤ 5 分钟；验证失败强制重新获取，限流 1 次/分钟/Agent（协议 §2.3/2.4）
 - **信任等级**：L0→L1 需身份验证；L1→L2 需 ≥10 次正向无负向；L2→L3 需用户授权 + 声誉 ≥0.9（协议 §3.4）
+- **声誉模块**：正向/负向事件累计，降权衰减，作为信任升级与异常判断依据（协议 §3.4 落地）
 - **UAC**：用户签发 JWT，sub 绑定 Agent（Token 绑定），scopes + restrictions（allowed_agents/rate_limit），时间窗口常量（协议 §3.2）
 - **权限交集**：effective = UAC scopes ∩ callee scopes，交集为空不得发放，拒绝带原因（user_policy/callee_policy）（协议 §3.3）
 - **五步握手**：init→challenge→proof→approval→complete，双向 nonce 签名验证，AAT+UAC 双重校验，时间戳偏差 >5min 拒绝，nonce 重放防护（协议 §7）
