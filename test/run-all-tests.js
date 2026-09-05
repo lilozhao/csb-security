@@ -28,7 +28,8 @@ const tests = [
   { name: 'rate-limiter.js (Layer 4 限流+异常检测)', file: 'test-rate-limiter.js' },
   { name: 'anomaly-detector.js (Layer 4 异常检测)', file: 'test-anomaly-detector.js' },
   { name: 'verify-signature.js (P0-3 D1 验证签名)', file: 'test-verify-signature.js' },
-  { name: 'verif-log.js (P0-3 D1 上链存证)', file: 'test-verif-log.js' }
+  { name: 'verif-log.js (P0-3 D1 上链存证)', file: 'test-verif-log.js' },
+  { name: 'validator-reputation.js (P0-3 D4 信誉衰减)', file: 'test-validator-reputation.js' }
 ];
 
 async function runAllTests() {
