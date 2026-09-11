@@ -183,9 +183,11 @@ write 委托请求
 
 | 阶段 | 内容 | 验收 |
 |------|------|------|
-| **P0**（可最快见效） | 账本落盘（`trust-evidence.jsonl` + `trust-store.json`）+ 启动加载/重放；消息链采集钩子（正向/负向）；`trust-attest.js` 追溯认定 CLI | 重启后等级不丢；阿轩 认定到 L2；`recordInteraction` 有真实调用点 |
-> **P0 进度（2026-09-11）**：骨架已落地 —— `lib/trust/{evidence-ledger,trust-store,collector}.js` + `scripts/trust-attest.js` + `test/trust-p0.test.js`（**33 用例 100%**）。
-> 待接：csb-a2a-aip 消息链的实际调用点（`message_ok` / `guard_blocked` / `delegate_completed` / `user_declined`）—— 接口已就绪（`EvidenceCollector.*`），尚未接线。
+| **P0**（可最快见效） | 账本落盘（`trust-evidence.jsonl` + `trust-store.json`）+ 启动加载/重放；消息链采集钩子（正向/负向）；`trust-attest.js` 追溯认定 CLI | 重启后等级不丢；阿轩 认定到 L2；`recordInteraction` 有真实调用点 ✅ **已接线**（csb-a2a-aip，2026-09-11） |
+> **P0 进度（2026-09-11）**：✅ **闭环完成** —— 骨架 `lib/trust/{evidence-ledger,trust-store,collector}.js` + `scripts/trust-attest.js` + `test/trust-p0.test.js`（**33 用例 100%**）；
+> **消息链已接线**（同日）：csb-a2a-aip `a2a-trust-evidence.js` + 四个挂钩点（`message_ok` / `guard_blocked` / `delegate_completed` / `user_declined`）+ `tests/trust-evidence.test.js`（**20 用例 100%**）。
+> 详见 csb-a2a-aip `docs/TRUST-EVIDENCE-WIRING.md`。顺带修掉两个真 bug：AAT 验签因相对路径多一层而**从未真正生效**（异常被吞）；`verifyChain()` 返回字段误用导致诊断指标撒谎。
+> 未完成项（不影响接线）：账本**签名密钥未配**（`status().signed=false` → `degraded`）；阿轩 ⇒ L2 追溯认定仍待一澜签字。
 >
 > **P0 实现中发现的两条硬结论**：
 > 1. **哈希链挡不住「格式完整的插入」** —— 一个 prev_hash/hash 都算对的完整伪造条目能骗过链校验（测试已诚实记录该局限）。⇒ **信任账本必须启用签名**，硬要求不是选项（启用签名后插入条目因「缺少签名」被检出）。

@@ -176,6 +176,7 @@ carbon-silicon-bond-protocol（协议套件·主仓）
 
 > **📌 信任升级专项（2026-09-11）**：M1 只落了「等级定义 + 升级规则（内存）」，但**没有证据入口 / 落盘 / 升级编排** —— 实测导致跨宿主 write 委托永久 `TRUST_INSUFFICIENT`。
 > 设计草案见 **[`TRUST-UPGRADE-DESIGN.md`](./TRUST-UPGRADE-DESIGN.md)**（三处断链 + 证据账本 + L3 双门控 + 追溯认定 + 里程碑 P0~P3）。
+> **P0 已闭环（2026-09-11）**：账本/快照/采集器/CLI 落地 + **A2A 消息链接线**（csb-a2a-aip `a2a-trust-evidence.js`，见其 `docs/TRUST-EVIDENCE-WIRING.md`）。剩余：账本签名密钥待配、阿轩 L2 追溯认定待签字、P1 UAC 双门。
 
 1. ~~仓库托管~~ ✅ 已确认（四平台已建库，2026-08-22）
 2. M1 启动时间：规划确认后立即开始？
