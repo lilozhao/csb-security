@@ -184,6 +184,13 @@ write 委托请求
 | 阶段 | 内容 | 验收 |
 |------|------|------|
 | **P0**（可最快见效） | 账本落盘（`trust-evidence.jsonl` + `trust-store.json`）+ 启动加载/重放；消息链采集钩子（正向/负向）；`trust-attest.js` 追溯认定 CLI | 重启后等级不丢；阿轩 认定到 L2；`recordInteraction` 有真实调用点 |
+> **P0 进度（2026-09-11）**：骨架已落地 —— `lib/trust/{evidence-ledger,trust-store,collector}.js` + `scripts/trust-attest.js` + `test/trust-p0.test.js`（**33 用例 100%**）。
+> 待接：csb-a2a-aip 消息链的实际调用点（`message_ok` / `guard_blocked` / `delegate_completed` / `user_declined`）—— 接口已就绪（`EvidenceCollector.*`），尚未接线。
+>
+> **P0 实现中发现的两条硬结论**：
+> 1. **哈希链挡不住「格式完整的插入」** —— 一个 prev_hash/hash 都算对的完整伪造条目能骗过链校验（测试已诚实记录该局限）。⇒ **信任账本必须启用签名**，硬要求不是选项（启用签名后插入条目因「缺少签名」被检出）。
+> 2. **追溯认定隐含身份认定** —— 否则出现「宿主用户已签字认定关系、派生等级却卡在 L0」的荒谬态（实测踩到）。认定 = 身份 + 关系一次认定，仍受 L2 上限与未清偿负向约束。
+
 | **P1** | UAC 签发/校验接入 bridge（L3 双门）+ 撤销路径；信任来源标注进审计 | write 委托在"等级 + UAC + 用户确认"三条件齐备时放行；撤销后立即失效 |
 | **P2** | 见证人机制（witnessThreshold=3）+ 异常检测联动（`anomaly-detector` 触发降级） | 3 见证人认定用例通过；异常自动降级用例通过 |
 | **P3** | 跨机证据互认（各机自持账本 + 定期互签账本摘要 hash） | 双机摘要互签一致；不一致可定位到具体条目 |

@@ -14,6 +14,7 @@
 | **M3 (P2)** | 会话密钥协商（ECDH）+ Token 绑定 + PKCE | ✅ 完成 2026-08-22 · 105 用例 100% |
 | **M4 (P2)** | 哈希链审计 + 重放防护 + 限流 | ✅ 完成 2026-08-22 · 131 用例 100% |
 | **M5 (P3)** | 异常检测（规则引擎）+ 集成 csb-a2a-aip | ✅ 完成 2026-08-22 · 145 用例 100% |
+| **P0 信任升级** | 证据账本 + 等级重放派生 + 采集器 + 追溯认定 CLI | ✅ 骨架完成 2026-09-11 · 33 用例 100% |
 
 > 🎉 **M1-M5 全部完成**（2026-08-22）：五层安全架构完整落地，145 测试用例 100% 通过
 > csb-a2a-aip 集成 Phase 1-3 全部完成（trust/e2e 换源 · 按 Agent 限流 + 哈希链审计 · 对等握手端点 + 异常检测），全部可降级
@@ -69,6 +70,10 @@ lib/
 │   ├── uac.js          用户授权凭证（签发/验证 + restrictions）
 │   ├── scope-intersection.js  权限交集（granted/denied + 原因）
 │   └── reputation.js   声誉模块（信任升级依据，L2→L3 门槛 ≥0.9）
+├── trust/              Layer 2 扩展: 信任升级（P0 骨架 · 2026-09-11）
+│   ├── evidence-ledger.js  证据账本（append-only JSONL + 哈希链 + Ed25519 签名）
+│   ├── trust-store.js      信任快照（账本重放 → L0~L3 派生，重启不丢）
+│   └── collector.js        证据采集器（唯一写入口 + 防刷分 + 「用户拒绝不计负向」红线）
 ├── handshake/          五步对等握手
 │   └── handshake.js    init→challenge→proof→approval→complete + 渐进式等级
 ├── transport/           Layer 3: 传输安全
@@ -85,7 +90,7 @@ lib/
 │   ├── audit-query.js     按 Agent/事件/时间/scope 查询 + 轨迹（协议 §6.3）
 │   └── tamper-check.js    审计篡改校验（对账 + 断链定位）
 └── index.js            统一入口
-scripts/                实操脚本（handshake-full.js 对等握手 · rotate-keys.js 密钥轮换 · verify-handshake-*.js 验证）
+scripts/                实操脚本（handshake-full.js 对等握手 · rotate-keys.js 密钥轮换 · trust-attest.js 信任查询/校验/追溯认定）
 keys/                   公钥权威源（user-yilan.pubkey.json 等，仅公开公钥，私钥永不入库）
 test/                   测试（node test/run-all-tests.js）
 examples/               使用示例

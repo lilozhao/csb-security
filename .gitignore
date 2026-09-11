@@ -7,3 +7,7 @@ data/*-key.pem
 *.log
 .DS_Store
 .env
+
+# 信任账本（运行时数据，本地留痕，不入库）
+data/trust-evidence.jsonl
+data/trust-store.json
