@@ -29,7 +29,9 @@ const tests = [
   { name: 'anomaly-detector.js (Layer 4 异常检测)', file: 'test-anomaly-detector.js' },
   { name: 'verify-signature.js (P0-3 D1 验证签名)', file: 'test-verify-signature.js' },
   { name: 'verif-log.js (P0-3 D1 上链存证)', file: 'test-verif-log.js' },
-  { name: 'validator-reputation.js (P0-3 D4 信誉衰减)', file: 'test-validator-reputation.js' }
+  { name: 'validator-reputation.js (P0-3 D4 信誉衰减)', file: 'test-validator-reputation.js' },
+  // 信任升级 P0 骨架（2026-09-11）：输出格式为 "trust-p0: N passed, M failed"
+  { name: 'trust-p0.test.js (信任升级 P0：账本/派生/采集器)', file: 'trust-p0.test.js', altFormat: true }
 ];
 
 async function runAllTests() {
@@ -55,6 +57,15 @@ async function runAllTests() {
       if (match) {
         totalPassed += parseInt(match[1]);
         totalFailed += parseInt(match[2]);
+      } else {
+        // 兼容 "xxx: N passed, M failed" 格式（新增测试模块）
+        const alt = output.match(/(\d+) passed, (\d+) failed/);
+        if (alt) {
+          totalPassed += parseInt(alt[1]);
+          totalFailed += parseInt(alt[2]);
+        } else {
+          console.log(`⚠️ 未识别测试输出格式: ${test.file}`);
+        }
       }
     } catch (error) {
       console.log(`❌ 测试失败: ${error.message}`);
