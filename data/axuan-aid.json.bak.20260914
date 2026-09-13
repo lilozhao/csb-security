@@ -1,0 +1,18 @@
+{
+  "csb_version": "1.0",
+  "agent_id": "axuan@172.28.0.5:3100",
+  "name": "阿轩",
+  "emoji": "",
+  "description": "",
+  "public_key": {
+    "crv": "Ed25519",
+    "x": "zYDyPskv_IMP6IdW2HKjSZ0GMEyU1oI4LMhoJUUo-2Q",
+    "kty": "OKP",
+    "kid": "axuan-callee-20260825"
+  },
+  "endpoint": "http://172.28.0.5:3100/a2a/json-rpc",
+  "created_at": "2026-08-24T23:14:49.200Z",
+  "expires_at": "2027-08-24T23:14:49.200Z",
+  "trust_level": "L0",
+  "signature": "y/YwveHp8R/8TrgHGoHLWqrnzewHwWyxXN0JsYTwxbhF3cdMswGw887uXugGwM/lAyzEzDd7Mx5N/Sfn69CjDQ=="
+}
