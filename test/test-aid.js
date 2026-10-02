@@ -115,6 +115,61 @@ test('fromIdentity 从身份 JSON 生成', () => {
   assert.ok(aid.verifyAID(doc).valid);
 });
 
+// 6b. [明澈 P2 · 2026-10-02] 身份不许有默认值：缺 name 必须抛错，不得拼出 undefined@host
+test('fromIdentity 缺 name → 抛错（不产生伪身份）', () => {
+  assert.throws(
+    () => aid.fromIdentity({ port: 3100, host: 'localhost' }, { publicJwk, privateKey }),
+    /identity\.name/
+  );
+});
+
+test('fromIdentity 非对象 → 抛错', () => {
+  assert.throws(
+    () => aid.fromIdentity(null, { publicJwk, privateKey }),
+    /必须是对象/
+  );
+});
+
+// [明澈 P2 · 2026-10-02] env 身份名（方案 a：A2A_AGENT_NAME 优先，CDP_NAME 兼容）
+test('identityNameFromEnv：A2A_AGENT_NAME 优先', () => {
+  const snap = { ...process.env };
+  process.env.A2A_AGENT_NAME = 'env-a2a';
+  process.env.CDP_NAME = 'env-cdp';
+  try { assert.strictEqual(aid.identityNameFromEnv(), 'env-a2a'); }
+  finally { Object.assign(process.env, snap); if (snap.A2A_AGENT_NAME === undefined) delete process.env.A2A_AGENT_NAME; if (snap.CDP_NAME === undefined) delete process.env.CDP_NAME; }
+});
+
+test('identityNameFromEnv：CDP_NAME 兼容回退', () => {
+  const snap = { ...process.env };
+  delete process.env.A2A_AGENT_NAME;
+  process.env.CDP_NAME = 'env-cdp';
+  try { assert.strictEqual(aid.identityNameFromEnv(), 'env-cdp'); }
+  finally { if (snap.A2A_AGENT_NAME !== undefined) process.env.A2A_AGENT_NAME = snap.A2A_AGENT_NAME; if (snap.CDP_NAME === undefined) delete process.env.CDP_NAME; }
+});
+
+test('fromIdentity 缺 name 但 env 给了 → 用 env 生成 AID', () => {
+  const snap = { ...process.env };
+  delete process.env.CDP_NAME;
+  process.env.A2A_AGENT_NAME = 'env-only';
+  try {
+    const doc = aid.fromIdentity({ port: 3100, publicHost: '127.0.0.1' }, { publicJwk, privateKey });
+    assert.strictEqual(doc.name, 'env-only');
+    assert.strictEqual(doc.agent_id, 'env-only@127.0.0.1:3100');
+  } finally { if (snap.A2A_AGENT_NAME === undefined) delete process.env.A2A_AGENT_NAME; else process.env.A2A_AGENT_NAME = snap.A2A_AGENT_NAME; if (snap.CDP_NAME !== undefined) process.env.CDP_NAME = snap.CDP_NAME; }
+});
+
+test('fromIdentity：env 与 identity.name 不一致 → 抛错', () => {
+  const snap = { ...process.env };
+  delete process.env.CDP_NAME;
+  process.env.A2A_AGENT_NAME = 'env-x';
+  try {
+    assert.throws(
+      () => aid.fromIdentity({ name: 'file-y', port: 3100 }, { publicJwk, privateKey }),
+      /身份名不一致/
+    );
+  } finally { if (snap.A2A_AGENT_NAME === undefined) delete process.env.A2A_AGENT_NAME; else process.env.A2A_AGENT_NAME = snap.A2A_AGENT_NAME; if (snap.CDP_NAME !== undefined) process.env.CDP_NAME = snap.CDP_NAME; }
+});
+
 // 7. 密钥对生成 JWK 格式
 test('generateKeyPair 输出 JWK 格式', () => {
   assert.strictEqual(publicJwk.kty, 'OKP');

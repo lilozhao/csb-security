@@ -159,6 +159,17 @@ carbon-silicon-bond-protocol（协议套件·主仓）
 - **集成方**：csb-a2a-aip（A2A 通信引擎）将 require csb-security 作为安全中间件
 - **联动**：审计日志 = CSB-Memory RAW 层的证据底座（灰火三态 sealed 标记）
 
+### 🔗 跨库身份名一致性（2026-10-02 一澜定）
+
+本仓与 csb-a2a-aip 等库可能被**同一实例同时安装**。此时：
+
+> **所有库的 `.env` 里的 `A2A_AGENT_NAME` 必须是同一个值。**
+
+- 身份名是**实例级**的，不是库级的 → 不能每个库各取一个名
+- 不一致的后果：A2A 以某名注册、security 以另一名签 AID → **信任链撕裂**
+- 校验：`lib/identity/aid.js` 的 `fromIdentity` 保证**库内** env 与身份对象一致；
+  **跨库**一致性由装配层（如 `csb-a2a-aip/server_v5.js` 启动时 best-effort 提醒）负责
+
 ---
 
 ## 七、仓库信息（2026-08-22 已建库）

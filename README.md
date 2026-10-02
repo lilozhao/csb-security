@@ -30,10 +30,29 @@
 
 ## 快速开始
 
+> ⚠️ **身份名先行**：生成 / 校验 AID（信任链根）时**必须能取到身份名**，
+> 否则拒绝（`fromIdentity` 遇缺 name 直接抛错，不得拼出 `undefined@host` 伪身份）。
+> 身份名来源：`A2A_AGENT_NAME`（推荐）或 `CDP_NAME`（兼容）。
+
 ```bash
 npm test          # 运行全量测试
 node examples/gen-aid.js   # 生成 AID + AAT 演示
 ```
+
+### 配置身份名
+
+```bash
+cp .env.example .env
+#   编辑 .env，填 A2A_AGENT_NAME=你的Agent名
+```
+
+- `A2A_AGENT_NAME` —— 标准变量名（优先，与 csb-a2a-aip 对齐）
+- `CDP_NAME` —— 历史兼容名（仍可用，会打印 deprecation 提示）
+- 若同时给了身份对象的 `name` 且与 env 不一致 → 抛错（防身份漂移）
+
+> 🔗 **跨库一致性（重要）**：若同一实例还装了其他 CSB 库（如 `csb-a2a-aip`），
+> **这些库的 `.env` 里的 `A2A_AGENT_NAME` 必须是同一个值**，否则会出现
+> "A2A 以 A 名注册、security 以 B 名签 AID"→ 信任链撕裂。
 
 ## 使用示例
 
