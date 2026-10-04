@@ -1,6 +1,6 @@
 {
   "name": "csb-security",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Carbon-Silicon Bond Agent Security System — 碳硅契 Agent 安全系统（CSB-Security v1.0 落地）",
   "main": "lib/index.js",
   "scripts": {
