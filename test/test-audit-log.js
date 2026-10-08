@@ -172,5 +172,36 @@ test('summary 统计', () => {
   assert.strictEqual(s.chainValid, true);
 });
 
+// 11. 扩展字段 extra（verif-log / breach 等结构化载荷）——2026-10-08 明德补测
+test('extra 扩展字段：入库 + 纳入哈希链', () => {
+  const log = new AuditLog({ privateKey: keyPair.privateKey, publicKey: keyPair.publicKey });
+  const rec = log.append(makeEntry(), { details: { breach_id: 'br-abc123', reason: '冒充他人身份', evidence: 'thread/1' } });
+  assert.deepStrictEqual(rec.details, { breach_id: 'br-abc123', reason: '冒充他人身份', evidence: 'thread/1' });
+  assert.strictEqual(log.verifyChain().valid, true);
+});
+
+test('extra 被篡改 → 哈希链检出 entry_tampered', () => {
+  const log = new AuditLog({ privateKey: keyPair.privateKey, publicKey: keyPair.publicKey });
+  log.append(makeEntry());
+  log.append(makeEntry({ event_type: 'breach_proposed' }), { details: { breach_id: 'br-x', reason: '原理由' } });
+  log.entries[1].details.reason = '（被改过）';   // 直接改内存副本
+  const v = log.verifyChain();
+  assert.strictEqual(v.valid, false);
+  assert.strictEqual(v.reason, 'entry_tampered');
+  assert.strictEqual(v.brokenAt, 1);
+});
+
+test('extra 不能覆盖链核心保留字段', () => {
+  const log = new AuditLog();
+  const rec = log.append(makeEntry(), { result: 'hacked', seq: 999, prev_hash: 'x', hash: 'fake', event_type: 'spoofed', details: { ok: true } });
+  assert.strictEqual(rec.result, 'success');        // 未被 extra 覆盖
+  assert.strictEqual(rec.event_type, 'handshake_complete');
+  assert.strictEqual(rec.seq, 1);
+  assert.strictEqual(rec.prev_hash, 'GENESIS');
+  assert.notStrictEqual(rec.hash, 'fake');
+  assert.deepStrictEqual(rec.details, { ok: true }); // 非保留字段照常并入
+  assert.strictEqual(log.verifyChain().valid, true);
+});
+
 console.log(`\n通过: ${passed}\n失败: ${failed}\n`);
 process.exit(failed > 0 ? 1 : 0);
