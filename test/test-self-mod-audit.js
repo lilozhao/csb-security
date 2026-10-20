@@ -234,6 +234,23 @@ test('账本可被 verify：篡改一条 → 检出 tampered', () => {
   assert.strictEqual(bad.valid, false, '手改必须被检出');
 });
 
+
+// ── 9. 没有清单 ≠ 没有保护区段（2026-10-21 补）─────────────
+test('未传 segments（null）→ review NO_SEGMENTS，不得按「无保护」放行', () => {
+  const a = new SelfModAudit({ baseDir: '/nonexistent', contents: { 'AGENTS.md': AGENTS } });
+  assert.strictEqual(a.segments, null, '未传时必须记 null，不是空数组');
+  const r = a.assess(GOOD);
+  assert.strictEqual(r.decision, 'review');
+  assert.ok(r.reasons.some(x => x.code === 'NO_SEGMENTS'));
+});
+
+test('显式传空数组 [] → 允许（调用方明确声明「本场景无保护区段」）', () => {
+  const a = new SelfModAudit({ segments: [], contents: { 'AGENTS.md': AGENTS } });
+  assert.deepStrictEqual(a.segments, []);
+  const r = a.assess(GOOD);
+  assert.notStrictEqual(r.decision, 'review', '显式空数组与未传必须区别对待');
+});
+
 // ── 汇总 ─────────────────────────────────────────────────
 console.log(`\n通过: ${pass}\n失败: ${fail}\n`);
 if (fail > 0) { failures.forEach(f => console.error(`  - ${f.name}: ${f.error}`)); process.exit(1); }
