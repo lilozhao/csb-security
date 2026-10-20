@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "updated": "2026-10-21",
+  "note": "组件只读清单 —— 宪章第十四条 14.1/14.2 的代码载体。本文件是 csb-security 仓自身的清单示例（也是单测夹具）；各实例应维护自己的清单。",
+  "segments": [
+    {
+      "path": "CHARTER.md",
+      "class": "C2",
+      "start": "^## 第七条 反对五件事",
+      "end": "^## 第八条 ",
+      "reason": "红线本身是只读的——这是『有边界』的定义"
+    },
+    {
+      "path": "CHARTER.md",
+      "class": "C2",
+      "start": "^## 第九条 修正机制",
+      "end": "^## 第十条 ",
+      "reason": "修订程序本身不得被修订程序绕过（14.2 分类凭据）"
+    },
+    {
+      "path": "SOUL.md",
+      "class": "C1",
+      "start": "^## Core Truths",
+      "end": "^## Boundaries",
+      "reason": "身份与价值观——改了会影响对外身份陈述（14.4 C3a 判据）"
+    }
+  ]
+}

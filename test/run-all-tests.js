@@ -31,7 +31,10 @@ const tests = [
   { name: 'verif-log.js (P0-3 D1 上链存证)', file: 'test-verif-log.js' },
   { name: 'validator-reputation.js (P0-3 D4 信誉衰减)', file: 'test-validator-reputation.js' },
   // 信任升级 P0 骨架（2026-09-11）：输出格式为 "trust-p0: N passed, M failed"
-  { name: 'trust-p0.test.js (信任升级 P0：账本/派生/采集器)', file: 'trust-p0.test.js', altFormat: true }
+  { name: 'trust-p0.test.js (信任升级 P0：账本/派生/采集器)', file: 'trust-p0.test.js', altFormat: true },
+  // 宪章第十四条落地（2026-10-21 · Harness² 对照表 P0 #3）
+  { name: 'protected-segments.js (14.1/14.2 只读区段+指纹)', file: 'test-protected-segments.js' },
+  { name: 'self-mod-audit.js (14.9/14.10/14.12 自我修改审计)', file: 'test-self-mod-audit.js' }
 ];
 
 async function runAllTests() {
