@@ -17,8 +17,8 @@ const USER_KEY = fs.readFileSync(path.join(DATA, 'yilan-user-key.pem'), 'utf8');
 const USER_ID = 'user-yilan@csb';
 
 const CALLER_ID = 'ruolan@172.28.0.214:3100';
-const CALLEE_ID = 'mingde@47.121.28.125:3100';
-const CALLEE_ENDPOINT = 'http://47.121.28.125:3100/a2a/handshake';
+const CALLEE_ID = 'mingde@csbc.lilozkzy.top:3100';
+const CALLEE_ENDPOINT = 'http://csbc.lilozkzy.top:3100/a2a/handshake';
 const SCOPES = ['a2a:send'];  // 明德的 allowedScopes 只有 a2a:send
 
 function post(url, body, timeout = 20000) {

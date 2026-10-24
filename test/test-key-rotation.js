@@ -107,9 +107,9 @@ test('stats 返回缓存状态', async () => {
   const mgr = new KeyRotationManager({
     aidFetcher: async (id) => makeAID(id, kp)
   });
-  await mgr.getAID('qingyi@106.12.36.177:3100');
+  await mgr.getAID('qingyi@qingyi.example:3100');
   const stats = mgr.stats();
-  assert.ok(stats.cachedAgents.includes('qingyi@106.12.36.177:3100'));
+  assert.ok(stats.cachedAgents.includes('qingyi@qingyi.example:3100'));
   assert.strictEqual(stats.fresh, 1);
 });
 
