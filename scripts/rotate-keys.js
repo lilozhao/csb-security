@@ -29,11 +29,56 @@ const ROOT = path.resolve(__dirname, '..');
 const aid = require(path.join(ROOT, 'lib/identity/aid'));
 
 // ---------- 参数解析 ----------
+// [2026-10-24 · 明德实测反馈]
+// 旧实现对 key 只做 `replace(/^--/,'')` 直取，因此：
+//   · 文档/usage 里写的是 `--agent-id`，代码读的是 `args.agentId`（驼峰）→ 永远读不到
+//   · 更糟的是**静默失败**：有旧 AID 时 `args.agentId || oldAID.agent_id` 会回退到旧值，
+//     用户以为改了 endpoint/agent_id，实际没改，且不报任何错。
+//     （违反 CSB P1「拒绝要计分」——不认识的参数不该被默默忽略）
+// 新实现：驼峰与短横线两种写法都接受；未知参数直接报错退出。
+const KNOWN_KEYS = new Set([
+  'aid', 'key', 'name', 'endpoint',
+  'agentId', 'agent-id', 'agent_id',
+]);
+// 开关型参数（不带取值，出现即 true）
+const FLAG_KEYS = new Set(['new', 'dry-run', 'dryRun']);
+
+/** 把 --agent-id / --agent_id / --agentId 统一成 agentId */
+function canonicalKey(raw) {
+  if (raw === 'agent-id' || raw === 'agent_id') return 'agentId';
+  return raw;
+}
+
 function parseArgs(argv) {
   const args = {};
-  for (let i = 0; i < argv.length; i += 2) {
-    const key = argv[i].replace(/^--/, '');
-    args[key] = argv[i + 1];
+  for (let i = 0; i < argv.length; ) {
+    const flag = argv[i];
+    if (!flag || !flag.startsWith('--')) {
+      console.error(`❌ 参数格式错误: "${flag}"（应以 -- 开头）`);
+      process.exit(1);
+    }
+    const raw = flag.replace(/^--/, '');
+
+    // 开关型：不消耗下一个参数
+    if (FLAG_KEYS.has(raw)) {
+      args[raw === 'dryRun' ? 'dry-run' : raw] = true;
+      i += 1;
+      continue;
+    }
+
+    if (!KNOWN_KEYS.has(raw)) {
+      console.error(`❌ 未知参数: ${flag}`);
+      console.error(`   可用: --aid --key --name --agent-id（或 --agentId）--endpoint [--new]`);
+      console.error('   提示：写错参数不会被默默忽略——这样才不会"以为改了其实没改"。');
+      process.exit(1);
+    }
+    const value = argv[i + 1];
+    if (value === undefined || value.startsWith('--')) {
+      console.error(`❌ 参数 ${flag} 缺少取值`);
+      process.exit(1);
+    }
+    args[canonicalKey(raw)] = value;
+    i += 2;
   }
   return args;
 }
@@ -43,17 +88,79 @@ const aidPath = args.aid;
 const keyPath = args.key;
 
 if (!aidPath || !keyPath) {
-  console.error('❌ 用法: node scripts/rotate-keys.js --aid <aid.json> --key <private-key.pem> [--name 名字] [--agent-id id] [--endpoint url]');
+  console.error('❌ 用法: node scripts/rotate-keys.js --aid <aid.json> --key <private-key.pem> [--name 名字] [--agent-id <id>] [--endpoint <url>]');
+  console.error('   （--agent-id 与 --agentId 两种写法都接受；相对路径以 csb-security/ 为基准解析）');
   process.exit(1);
 }
 
 // ---------- 读取现有 AID（若存在） ----------
+// [2026-10-24 · 明德实测反馈] 路径基准修正。
+// 旧实现一律 `path.resolve(ROOT, aidPath)`（ROOT = csb-security/），于是从其它目录运行时
+// `--aid csb-security/data/x.json` 会被解析成 csb-security/csb-security/data/x.json。
+// 更危险的是：解析失败只打一句「未找到现有 AID，将全新生成」就继续——
+// **等于可能静默覆盖用户以为还在用的 AID**。
+// 新规则：先按当前工作目录解析，再按 ROOT 解析；两处都没有且用户显式给了路径 → 报错退出。
+function resolveInput(p, label) {
+  const raw = String(p);
+  if (path.isAbsolute(raw)) {
+    if (fs.existsSync(raw)) return raw;
+    console.error(`❌ ${label} 不存在: ${raw}`);
+    console.error('   （绝对路径找不到文件，请检查路径）');
+    process.exit(1);
+  }
+  const fromCwd = path.resolve(process.cwd(), raw);
+  if (fs.existsSync(fromCwd)) return fromCwd;
+  const fromRoot = path.resolve(ROOT, raw);
+  if (fs.existsSync(fromRoot)) return fromRoot;
+  console.error(`❌ ${label} 找不到: ${raw}`);
+  console.error(`   已尝试: ${fromCwd}`);
+  console.error(`           ${fromRoot}`);
+  console.error('   注：不会"默默当作全新生成"——那可能覆盖你还在用的 AID。');
+  process.exit(1);
+}
+
 let oldAID = null;
-try {
-  oldAID = JSON.parse(fs.readFileSync(path.resolve(ROOT, aidPath), 'utf8'));
-  console.log('📄 现有 AID:', oldAID.agent_id, '| kid:', oldAID.public_key?.kid, '| expires:', oldAID.expires_at);
-} catch {
-  console.log('ℹ️  未找到现有 AID，将全新生成');
+// 解析后的**绝对写入路径**：读取和写入必须用同一个，否则会出现
+// 「读到了 csb-security/data/x.json，却往 csb-security/csb-security/data/x.json 写」的错位。
+let AID_OUT = null;
+let KEY_OUT = null;
+{
+  // 显式允许"全新生成"：文件确不存在时用 --new 明确表态
+  const explicitNew = process.argv.includes('--new');
+  const resolved = path.isAbsolute(aidPath) ? aidPath : null;
+  const candidates = resolved
+    ? [resolved]
+    : [path.resolve(process.cwd(), aidPath), path.resolve(ROOT, aidPath)];
+  const found = candidates.find(f => fs.existsSync(f));
+
+  if (found) {
+    try {
+      oldAID = JSON.parse(fs.readFileSync(found, 'utf8'));
+      console.log('📄 现有 AID:', oldAID.agent_id, '| kid:', oldAID.public_key?.kid, '| expires:', oldAID.expires_at);
+      console.log('   路径:', found);
+      AID_OUT = found;
+    } catch (e) {
+      console.error(`❌ AID 文件无法解析: ${found}`);
+      console.error('   ', e.message);
+      process.exit(1);
+    }
+  } else if (explicitNew) {
+    console.log('ℹ️  全新生成模式（--new）：现有 AID 不存在，将新建');
+    // 新建：保持用户给的位置（绝对则原样，相对则按 CWD），不要静默挪到 ROOT 下
+    AID_OUT = path.resolve(process.cwd(), aidPath);
+  } else {
+    console.error('❌ 找不到现有 AID 文件，拒绝继续（避免误覆盖）:');
+    for (const c of candidates) console.error('   尝试过:', c);
+    console.error('   · 想轮换已有 AID → 请给出正确路径');
+    console.error('   · 确实要新建 → 加 --new 明确表态');
+    process.exit(1);
+  }
+
+  // 密钥文件同理：轮换时已存在则原地更新；--new 时按用户给的位置
+  const keyCandidates = path.isAbsolute(keyPath)
+    ? [keyPath]
+    : [path.resolve(process.cwd(), keyPath), path.resolve(ROOT, keyPath)];
+  KEY_OUT = keyCandidates.find(f => fs.existsSync(f)) || path.resolve(process.cwd(), keyPath);
 }
 
 // ---------- 生成新密钥对 + 新 AID ----------
@@ -67,9 +174,19 @@ if (!agentId || !endpoint) {
   process.exit(1);
 }
 
+// [2026-10-24] name 提前校验：底层 aid.generateAID 会抛 "name is required"，
+// 但那句报错不告诉人怎么办（尤其全新生成时必须给 --name）。
+const resolvedName = args.name || oldAID?.name || '';
+if (!resolvedName) {
+  console.error('❌ 缺少 name（Agent 名称）');
+  console.error('   全新生成时必须提供：--name 你的名字');
+  console.error('   轮换已有 AID 时若旧文件里有 name 可省略');
+  process.exit(1);
+}
+
 const newAID = aid.generateAID({
   agentId,
-  name: args.name || oldAID?.name || '',
+  name: resolvedName,
   endpoint,
   publicJwk: keyPair.publicJwk,
   capabilities: oldAID?.capabilities || [],
@@ -78,21 +195,39 @@ newAID.public_key.kid = kid;
 
 // ---------- 备份旧文件 ----------
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-if (fs.existsSync(path.resolve(ROOT, aidPath))) {
-  const bak = `${aidPath}.bak-${stamp}`;
-  fs.copyFileSync(path.resolve(ROOT, aidPath), path.resolve(ROOT, bak));
+// [2026-10-24] --dry-run：只走到这里，打印将要发生什么，不写任何文件。
+// 起因：我验证参数缺陷时对生产 AID/私钥"干跑"了一次真实轮换 ——
+// 破坏性脚本没有 dry-run 本身就是缺陷，与参数 bug 同级。
+if (args['dry-run']) {
+  console.log('');
+  console.log('🔍 DRY-RUN（不会写任何文件）');
+  console.log('   将写入 AID :', AID_OUT);
+  console.log('   将写入私钥 :', KEY_OUT);
+  console.log('   新 agent_id :', agentId);
+  console.log('   新 endpoint :', endpoint);
+  console.log('   新 kid     :', kid);
+  console.log('   将备份旧文件:', fs.existsSync(AID_OUT) ? '是' : '否（新建）');
+  console.log('');
+  console.log('   去掉 --dry-run 才会真正写入。');
+  process.exit(0);
+}
+
+if (fs.existsSync(AID_OUT)) {
+  const bak = `${AID_OUT}.bak-${stamp}`;
+  fs.copyFileSync(AID_OUT, bak);
   console.log(`🗂️  已备份旧 AID → ${bak}`);
 }
-if (fs.existsSync(path.resolve(ROOT, keyPath))) {
-  const bak = `${keyPath}.bak-${stamp}`;
-  fs.copyFileSync(path.resolve(ROOT, keyPath), path.resolve(ROOT, bak));
+if (fs.existsSync(KEY_OUT)) {
+  const bak = `${KEY_OUT}.bak-${stamp}`;
+  fs.copyFileSync(KEY_OUT, bak);
   console.log(`🗂️  已备份旧私钥 → ${bak}`);
 }
 
-// ---------- 写新文件 ----------
-fs.writeFileSync(path.resolve(ROOT, aidPath), JSON.stringify(newAID, null, 2));
+// ---------- 写新文件（用解析后的绝对路径，与读取保持同一基准）----------
+fs.writeFileSync(AID_OUT, JSON.stringify(newAID, null, 2));
 const pem = keyPair.privateKey.export({ type: 'pkcs8', format: 'pem' });
-fs.writeFileSync(path.resolve(ROOT, keyPath), pem);
+fs.mkdirSync(path.dirname(KEY_OUT), { recursive: true });
+fs.writeFileSync(KEY_OUT, pem, { mode: 0o600 });
 
 console.log('');
 console.log('🎉 密钥轮换完成');
