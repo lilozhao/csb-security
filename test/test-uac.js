@@ -157,5 +157,35 @@ test('空 scopes 签发拒绝', () => {
   }), /scopes cannot be empty/);
 });
 
+// 11. 错误分类：未配置用户公钥 ≠ 公钥不可解析 ≠ 签名不匹配
+test('未配置用户公钥 → missing_user_public_key', () => {
+  const token = uac.createUAC({
+    userPrivateKey: userKey.privateKey, userId: USER, agentId: AGENT, scopes: ['chat']
+  });
+  const r = uac.verifyUAC(token, { userPublicKey: null, expectedAgentId: AGENT });
+  assert.strictEqual(r.valid, false);
+  assert.strictEqual(r.error, 'missing_user_public_key');
+});
+
+test('公钥不可解析 → bad_public_key（且带 detail）', () => {
+  const token = uac.createUAC({
+    userPrivateKey: userKey.privateKey, userId: USER, agentId: AGENT, scopes: ['chat']
+  });
+  const r = uac.verifyUAC(token, { userPublicKey: '-----BEGIN PUBLIC KEY-----', expectedAgentId: AGENT });
+  assert.strictEqual(r.valid, false);
+  assert.strictEqual(r.error, 'bad_public_key');
+  assert.ok(typeof r.detail === 'string' && r.detail.length > 0);
+});
+
+test('签名不匹配仍是 bad_signature（三类不可混同）', () => {
+  const other = aid.generateKeyPair('other-user-key');
+  const token = uac.createUAC({
+    userPrivateKey: userKey.privateKey, userId: USER, agentId: AGENT, scopes: ['chat']
+  });
+  const r = uac.verifyUAC(token, { userPublicKey: other.publicJwk, expectedAgentId: AGENT });
+  assert.strictEqual(r.valid, false);
+  assert.strictEqual(r.error, 'bad_signature');
+});
+
 console.log(`\n通过: ${passed}\n失败: ${failed}\n`);
 process.exit(failed > 0 ? 1 : 0);
