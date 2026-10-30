@@ -28,6 +28,29 @@ const crypto = require('crypto');
 const ROOT = path.resolve(__dirname, '..');
 const aid = require(path.join(ROOT, 'lib/identity/aid'));
 
+// [2026-10-30 · A-1 第①②件]
+// jcs 与契约签名必须与 csb-identity 逐字一致，否则重签出来的 covenant 验不过。
+// 直接复用 core.js 的实现（只取两个纯函数，加载无副作用），**不再复制第四份 jcs**。
+// 读不到也不致命：轮换仍可做，只是不重签契约（并明确告警，不静默）。
+let jcs = null;
+let verifyCovenant = null;
+try {
+  const core = require(path.join(ROOT, '..', 'csb-a2a-aip', 'csb-identity', 'core.js'));
+  jcs = core.jcs;
+  verifyCovenant = core.verifyCovenant;
+} catch (e) {
+  console.warn('⚠️  读不到 csb-identity/core.js（' + e.message + '）');
+  console.warn('   → 契约将无法重签，轮换后 AID 里的 covenant 会被移除（会明确写进输出）。');
+}
+
+/** 公钥指纹：SPKI DER 的 sha256（与 aat-keys.js / aat-doctor.js 同口径） */
+function spkiFingerprint(jwk) {
+  const der = crypto
+    .createPublicKey({ key: jwk, format: 'jwk' })
+    .export({ type: 'spki', format: 'der' });
+  return crypto.createHash('sha256').update(der).digest('hex');
+}
+
 // ---------- 参数解析 ----------
 // [2026-10-24 · 明德实测反馈]
 // 旧实现对 key 只做 `replace(/^--/,'')` 直取，因此：
@@ -184,7 +207,7 @@ if (!resolvedName) {
   process.exit(1);
 }
 
-const newAID = aid.generateAID({
+let newAID = aid.generateAID({
   agentId,
   name: resolvedName,
   endpoint,
@@ -192,6 +215,85 @@ const newAID = aid.generateAID({
   capabilities: oldAID?.capabilities || [],
 }, keyPair.privateKey);
 newAID.public_key.kid = kid;
+
+// ---------- 字段透传（2026-10-30 · A-1 第①件）----------
+// 以前这里是「白名单重建」：旧 AID 除了 name/agent_id/endpoint/capabilities 之外
+// 全部丢掉。10-27 实测丢掉的是 **`covenant`（善良契约）与 `description`** ——
+// 换完钥，新 AID 里没有契约记录，`/aat/issue` 会回 `covenant_unsigned`，
+// 等于「换了钥，也把自己换出了签发名单」。这类丢失不会报错，只会在下次签发时炸。
+//
+// 注意：covenant 不能原样复制 —— 它的 `sig` 是**旧私钥**对 {agent_id, version, hash}
+// 的签名，抄过来就变成「用旧钥签的契约挂在用新钥的 AID 上」，验签必失败且难查。
+// 正确做法：保留 version/hash（契约内容不变），用**新私钥重签**。
+const PERSIST_FIELDS = ['emoji', 'description', 'developer', 'capabilities', 'trust_level'];
+const carriedFields = [];
+for (const f of PERSIST_FIELDS) {
+  if (oldAID && oldAID[f] !== undefined) {
+    newAID[f] = oldAID[f];
+    carriedFields.push(f);
+  }
+}
+// created_at 是**身份生日**，不是文档生日 —— 轮换不该让一个三年的身份看起来像今天出生
+if (oldAID?.created_at) {
+  newAID.created_at = oldAID.created_at;
+  carriedFields.push('created_at');
+}
+
+// buildAID 会给 emoji/description 塞空串。旧 AID 没有的字段就别新增空值 ——
+// 「多出一个 `${f}: ""`」会让逐字段 diff 看起来像有变化（10-30 实测撞到）
+for (const f of ['emoji', 'description', 'developer']) {
+  if (newAID[f] === '' && !(oldAID && oldAID[f] !== undefined)) delete newAID[f];
+}
+
+let covenantState = 'none';
+let covenantVerified = null;
+if (oldAID?.covenant && oldAID.covenant.version && oldAID.covenant.hash) {
+  if (jcs) {
+    const body = {
+      agent_id: agentId,
+      covenant_version: oldAID.covenant.version,
+      covenant_hash: oldAID.covenant.hash,
+    };
+    const sig = crypto.sign(null, Buffer.from(jcs(body)), keyPair.privateKey).toString('base64');
+    newAID.covenant = {
+      version: oldAID.covenant.version,
+      hash: oldAID.covenant.hash,
+      signed_at: new Date().toISOString(),
+      sig,
+    };
+    covenantState = 're-signed';
+    // 自检：重签完立刻验一遍，别把「我以为签了」写进文件
+    if (verifyCovenant) {
+      // verifyCovenant 内部调 crypto.verify(null, …)，publicKey 必须是 KeyObject ——
+      // 传 JWK 会静默变成 bad_public_key（10-30 实测，第一版就是这么错的）
+      const pubKeyObject = crypto.createPublicKey({ key: keyPair.publicJwk, format: 'jwk' });
+      const v = verifyCovenant(
+        { agent_id: agentId, covenant_version: oldAID.covenant.version, covenant_hash: oldAID.covenant.hash, covenant_sig: sig },
+        pubKeyObject
+      );
+      covenantVerified = v.valid ? true : v.error;
+      if (!v.valid) {
+        console.error('❌ 契约重签后自检失败:', v.error);
+        console.error('   拒绝写入 —— 带着一个验不过的契约比没有契约更危险。');
+        process.exit(1);
+      }
+    }
+  } else {
+    covenantState = 'dropped(no-core)';
+  }
+}
+
+// 透传字段与契约都必须在**重新签名**之前挂上，否则签名覆盖不到它们
+newAID = aid.signAID(newAID, keyPair.privateKey);
+// 签完再自检一次结构（signAID 会重排 signature 到末尾）
+const selfCheck = aid.verifyAID(newAID);
+if (!selfCheck.valid) {
+  console.error('❌ 新 AID 自验失败:', selfCheck.error, '—— 拒绝写入');
+  process.exit(1);
+}
+
+const oldFp = oldAID?.public_key ? spkiFingerprint(oldAID.public_key) : null;
+const newFp = spkiFingerprint(keyPair.publicJwk);
 
 // ---------- 备份旧文件 ----------
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
@@ -207,6 +309,25 @@ if (args['dry-run']) {
   console.log('   新 endpoint :', endpoint);
   console.log('   新 kid     :', kid);
   console.log('   将备份旧文件:', fs.existsSync(AID_OUT) ? '是' : '否（新建）');
+  console.log('');
+  // [2026-10-30 · A-1 第①件] 演练清单第 2 步的判据是「F1 ≠ F0」，
+  // 但旧版 dry-run 一个指纹都不打，那条判据根本没法执行（10-27 实测）。
+  // 现在把候选公钥的 SPKI sha256 打出来 —— 与 aat-doctor / aat-keys 同口径。
+  console.log('   🔑 指纹对照（SPKI sha256）:');
+  console.log('      旧（服役中）: ' + (oldFp ? oldFp : '（无旧 AID）'));
+  console.log('      候选（本次）: ' + newFp + '   ← 每次 dry-run 都会不同，仅供对照');
+  console.log('      判定        : ' + (oldFp ? (oldFp === newFp ? '⚠️ 与旧钥相同（异常）' : '✅ 与旧钥不同') : '—'));
+  console.log('');
+  console.log('   📦 字段透传:');
+  console.log('      保留        : ' + (carriedFields.length ? carriedFields.join(', ') : '（无）'));
+  console.log('      契约        : ' + (
+    covenantState === 're-signed'
+      ? '✅ 保留 version/hash，已用候选新钥重签' + (covenantVerified === true ? '（自验通过）' : '')
+      : covenantState === 'dropped(no-core)'
+        ? '⚠️ 旧 AID 有契约，但读不到 core.js → 会被移除'
+        : '（旧 AID 无契约）'
+  ));
+  console.log('      新签名自验  : ✅ 通过（DRY-RUN 用的是一次性候选钥，不会落盘）');
   console.log('');
   console.log('   去掉 --dry-run 才会真正写入。');
   process.exit(0);
@@ -235,6 +356,12 @@ console.log('   AID :', aidPath, `(kid: ${kid})`);
 console.log('   KEY :', keyPath, '(PEM pkcs8)');
 console.log('   agent_id :', agentId);
 console.log('   expires  :', newAID.expires_at);
+console.log('   旧指纹   :', oldFp || '（无）');
+console.log('   新指纹   :', newFp);
+if (carriedFields.length) console.log('   已透传   :', carriedFields.join(', '));
+console.log('   契约     :', covenantState === 're-signed'
+  ? '✅ 已用新钥重签' + (covenantVerified === true ? '（自验通过）' : '')
+  : covenantState === 'dropped(no-core)' ? '⚠️ 已移除（读不到 core.js）' : '（无）');
 console.log('');
 console.log('⚠️  后续步骤（必须做）:');
 console.log('   1. 更新启动环境变量指向新文件（若路径没变则无需改）');
