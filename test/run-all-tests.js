@@ -36,7 +36,9 @@ const tests = [
   { name: 'protected-segments.js (14.1/14.2 只读区段+指纹)', file: 'test-protected-segments.js' },
   { name: 'self-mod-audit.js (14.9/14.10/14.12 自我修改审计)', file: 'test-self-mod-audit.js' },
   // 红线 2 落码（2026-10-21 · Harness² 对照表 §4 红线 2）
-  { name: 'h0-fingerprint-guard.js (H0 前后 C1/C2 指纹一致否则拒启)', file: 'test-h0-fingerprint-guard.js' }
+  { name: 'h0-fingerprint-guard.js (H0 前后 C1/C2 指纹一致否则拒启)', file: 'test-h0-fingerprint-guard.js' },
+  // P0-0b（2026-11-02）：信任账本规范化盲区修复 —— v2 含嵌套字段，v1 兼容
+  { name: 'ledger-canon-v2.js (P0-0b 账本规范化分版本)', file: 'test-ledger-canon-v2.js' }
 ];
 
 async function runAllTests() {
