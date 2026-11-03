@@ -104,5 +104,95 @@ test('信封加解密（envelope 兼容）', () => {
   assert.deepStrictEqual(dec.payload, { msg: 'hi' });
 });
 
+// ══════════════════════════════════════════════════════════════════════
+// [2026-11-03 · P0-4「A2A E2E 加密：真做，或诚实降级」]
+// 下面这组测试锁的是一个**曾经存在、且没人发现的假绿**：
+//   出站只置 obj.encrypted=true（没加密一个字节）· /health 按 enabled 报绿
+//   · 无密钥时 verifySignature 直接 return true（签名形同虚设）。
+// 三条都是「外观正常，判断不可信」，所以每条都要有机械判据。
+// ══════════════════════════════════════════════════════════════════════
+
+// 9. 三态：无密钥 = disabled + 明确 reason
+test('三态：无主密钥 → disabled（reason: no_master_key）', () => {
+  const e2e = new E2EEncryption({ masterKey: null });
+  const st = e2e.getStatus();
+  assert.strictEqual(st.status, 'disabled');
+  assert.strictEqual(st.reason, 'no_master_key');
+});
+
+// 10. 三态：有密钥但出站未真加密 = degraded（不是 enabled）
+test('三态：有密钥但出站未真加密 → degraded（reason: not_implemented）', () => {
+  const e2e = new E2EEncryption({ masterKey: MASTER_KEY });
+  const st = e2e.getStatus();
+  assert.strictEqual(st.status, 'degraded');
+  assert.strictEqual(st.reason, 'not_implemented');
+});
+
+// 11. 三态：只有真声明出站已加密才是 enabled
+test('三态：显式声明 outboundEncrypted 且有密钥 → enabled', () => {
+  const e2e = new E2EEncryption({ masterKey: MASTER_KEY, outboundEncrypted: true });
+  const st = e2e.getStatus();
+  assert.strictEqual(st.status, 'enabled');
+  assert.strictEqual(st.reason, null);
+});
+
+// 12. 反向自测：不允许「声明加密却没密钥」（那会让 enabled 再次变假绿）
+test('反向：outboundEncrypted=true 但无主密钥 → 直接抛错', () => {
+  assert.throws(
+    () => new E2EEncryption({ masterKey: null, outboundEncrypted: true }),
+    /outboundEncrypted/,
+    '声明出站已加密却没有主密钥，必须拒启而不是静默降级'
+  );
+});
+
+// 13. 关键不变量：degraded / disabled 都必须带 reason（不许空口说降级）
+test('不变量：非 enabled 状态必须带非空 reason', () => {
+  for (const opts of [{ masterKey: null }, { masterKey: MASTER_KEY }]) {
+    const st = new E2EEncryption(opts).getStatus();
+    if (st.status !== 'enabled') {
+      assert.ok(st.reason && st.reason.length > 0, `${st.status} 缺 reason —— 降级必须说清为什么`);
+    }
+  }
+});
+
+// 14. 假绿消除：getStats 里的 enabled 语义收紧为「有主密钥」，状态看 status
+test('假绿消除：getStats 同时给出 status 与收紧后的 enabled', () => {
+  const degraded = new E2EEncryption({ masterKey: MASTER_KEY }).getStats();
+  assert.strictEqual(degraded.status, 'degraded');
+  assert.strictEqual(degraded.enabled, true,        // 兼容字段：有主密钥
+    'enabled=true 只表示「有主密钥」，不代表出站已加密');
+  assert.strictEqual(degraded.outboundEncrypted, false);
+
+  const disabled = new E2EEncryption({ masterKey: null }).getStats();
+  assert.strictEqual(disabled.status, 'disabled');
+  assert.strictEqual(disabled.enabled, false);
+});
+
+// 15. 关键修复：无密钥时验签不再默认通过
+test('假绿消除：无主密钥时验签必须失败（原来直接 return true）', () => {
+  const e2e = new E2EEncryption({ masterKey: null });
+  assert.strictEqual(e2e.verifySignature('payload', 'any-signature'), false,
+    '没配密钥时任何签名都算通过 = 签名形同虚设');
+  const d = e2e.verifySignatureDetailed('payload', 'any-signature');
+  assert.strictEqual(d.valid, false);
+  assert.strictEqual(d.reason, 'no_master_key');
+});
+
+// 16. 无签名同样不算通过
+test('假绿消除：无签名时验签必须失败（reason: signature_missing）', () => {
+  const e2e = new E2EEncryption({ masterKey: MASTER_KEY });
+  assert.strictEqual(e2e.verifySignature('payload', null), false);
+  assert.strictEqual(e2e.verifySignatureDetailed('payload', null).reason, 'signature_missing');
+});
+
+// 17. 正常路径未受影响（有密钥 + 有签名 → 通过；内容不符 → 失败）
+test('回归：有密钥时正常验签行为不变', () => {
+  const e2e = new E2EEncryption({ masterKey: MASTER_KEY });
+  const sig = e2e.signMessage('payload');
+  assert.strictEqual(e2e.verifySignature('payload', sig), true);
+  assert.strictEqual(e2e.verifySignature('payload2', sig), false);
+  assert.strictEqual(e2e.verifySignatureDetailed('payload2', sig).reason, 'signature_mismatch');
+});
+
 console.log(`\n通过: ${passed}\n失败: ${failed}\n`);
 process.exit(failed > 0 ? 1 : 0);

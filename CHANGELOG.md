@@ -1,5 +1,35 @@
 # CHANGELOG · csb-security
 
+## v1.1.0（2026-11-03）— E2E 三态 + 验签不再默认通过（P0-4）
+
+### 背景
+
+本仓 `lib/transport/e2e-encryption.js` 是**权威实现**（`csb-a2a-aip/security-adapter.js` 优先加载本仓），
+所以 P0-4 的三态改造必须落在这里 —— 改 a2a-aip 那份 legacy 拷贝不生效。
+
+三处假绿（详见 `csb-a2a-aip/docs/e2e-honest-degrade-p0-4.md`）：
+出站只置布尔不加密 · `/health` 按 enabled 报绿 · 无密钥时验签直接通过。
+
+### 变更
+
+- 新增 `getStatus()` → `{status, reason}`，三态：`enabled` / `degraded` / `disabled`
+- 新增 `verifySignatureDetailed()` → `{valid, reason}`，四种 reason：`no_master_key` / `signature_missing` / `signature_length_mismatch` / `signature_mismatch`
+- `verifySignature()` 改回布尔语义，**无密钥不再 return true**
+- `getStats()` 增 `status` / `reason` / `outboundEncrypted`；`enabled` 保留但语义收紧为「有主密钥」
+- `encrypt()` 无密钥时返回体带 `reason: 'no_master_key'`
+- 构造时 `outboundEncrypted=true` 但无主密钥 → 抛错
+- 导出 `E2E_STATUS` 常量
+
+### ⚠️ 破坏性变更
+
+`verifySignature()` 原来在**无密钥或无签名时返回 `true`**（等于签名形同虚设），现在返回 `false`。
+全仓排查：无生产调用方依赖旧行为（只有本仓单测，且它测的是「有密钥 + 有签名」的正反例）。
+需要区分原因的调用方改用 `verifySignatureDetailed()`。
+
+### 判据
+
+`npm test` → **337/337 全绿**；`test/test-e2e-encryption.js` **17/17**（新增 9 条：三态三分 · 反向自测 · 不变量 · 假绿消除 ×3 · 回归）
+
 ## v1.0.1（2026-10-24）— UAC 验签错误三分：不再把配置问题读成签名问题
 
 ### 背景

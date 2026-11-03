@@ -28,6 +28,18 @@ const crypto = require('crypto');
 const ROOT = path.resolve(__dirname, '..');
 const aid = require(path.join(ROOT, 'lib/identity/aid'));
 
+// [2026-10-30 · A-4 ③] dry-run 可核对底座。
+// 为什么是它：10-27 那版 dry-run 打了指纹，但「候选 kid」每次现生成 →
+// 两次 dry-run 永远不同，机器比不了，只能人眼对。底座把「易变字段」显式排除出
+// PLAN_ID，于是「同样的输入 → 同一个 PLAN_ID」变成一条可执行的判据。
+let dryPlan = null;
+try {
+  dryPlan = require(path.join(ROOT, '..', 'scripts', 'lib', 'dry-plan.js'));
+} catch (e) {
+  // 独立仓使用时可能没有 workspace —— 不致命，但必须明说（不静默降级）
+  console.warn('⚠️  读不到 scripts/lib/dry-plan.js（' + e.message + '）→ 本次 dry-run 不打 PLAN_ID');
+}
+
 // [2026-10-30 · A-1 第①②件]
 // jcs 与契约签名必须与 csb-identity 逐字一致，否则重签出来的 covenant 验不过。
 // 直接复用 core.js 的实现（只取两个纯函数，加载无副作用），**不再复制第四份 jcs**。
@@ -295,6 +307,28 @@ if (!selfCheck.valid) {
 const oldFp = oldAID?.public_key ? spkiFingerprint(oldAID.public_key) : null;
 const newFp = spkiFingerprint(keyPair.publicJwk);
 
+// ---------- 计划（dry-run 与真做共用同一份）----------
+// 判据：`PLAN_ID` 在两次 dry-run 之间、以及 dry-run 与真做之间，必须逐字相同。
+// 易变字段（新钥/kid/过期时间/签名）标 volatile 后不参与 PLAN_ID ——
+// 它们的值每次不同，但只要「谁会被改、改前是什么」没变，PLAN_ID 就该一样。
+const plan = dryPlan ? dryPlan.makePlan({
+  action: 'rotate-key',
+  target: aidPath,
+  fields: [
+    dryPlan.field('agent_id', oldAID?.agent_id, agentId),
+    dryPlan.field('endpoint', oldAID?.endpoint, endpoint),
+    dryPlan.field('kid', oldAID?.kid, kid, { volatile: true, note: '含时间戳，每次现生成' }),
+    dryPlan.field('public_key.x', oldAID?.public_key?.x, keyPair.publicJwk.x, { volatile: true, note: '新密钥对，每次现生成' }),
+    dryPlan.field('expires_at', oldAID?.expires_at, newAID.expires_at, { volatile: true }),
+    dryPlan.field('covenant.sig', oldAID?.covenant?.sig, newAID.covenant?.sig || null, { volatile: true }),
+    dryPlan.field('covenant.version', oldAID?.covenant?.version, newAID.covenant?.version),
+    dryPlan.field('created_at', oldAID?.created_at, newAID.created_at),
+    // created_at 在 carriedFields 里也有（身份生日须透传）—— 上面已经单列，这里去重
+    ...carriedFields.filter((f) => f !== 'created_at').map((f) => dryPlan.field(f, oldAID?.[f], newAID[f])),
+  ],
+  meta: { aid: path.relative(ROOT, AID_OUT), key: path.relative(ROOT, KEY_OUT), backup: true },
+}) : null;
+
 // ---------- 备份旧文件 ----------
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
 // [2026-10-24] --dry-run：只走到这里，打印将要发生什么，不写任何文件。
@@ -329,6 +363,9 @@ if (args['dry-run']) {
   ));
   console.log('      新签名自验  : ✅ 通过（DRY-RUN 用的是一次性候选钥，不会落盘）');
   console.log('');
+  // [2026-10-30 · A-4 ③] 可核对的一行：同输入 → 同 PLAN_ID。
+  // 任何含「新钥/kid/时间戳」的值都是易变的，唯有这行能机器比对。
+  if (plan) console.log(dryPlan.render(plan, { title: '🔍 DRY-RUN 计划（可核对）' }));
   console.log('   去掉 --dry-run 才会真正写入。');
   process.exit(0);
 }
@@ -352,6 +389,8 @@ fs.writeFileSync(KEY_OUT, pem, { mode: 0o600 });
 
 console.log('');
 console.log('🎉 密钥轮换完成');
+// 真做时打印同一个 PLAN_ID —— 与 dry-run 那次逐字比，对不上就说明「做的不是说过的那件事」
+if (plan) console.log('   ' + dryPlan.summaryLine(plan));
 console.log('   AID :', aidPath, `(kid: ${kid})`);
 console.log('   KEY :', keyPath, '(PEM pkcs8)');
 console.log('   agent_id :', agentId);
