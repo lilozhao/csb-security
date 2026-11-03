@@ -23,6 +23,7 @@ const tests = [
   { name: 'token-binding.js (Layer 3 Token 绑定)', file: 'test-token-binding.js' },
   { name: 'pkce.js (Layer 3 PKCE)', file: 'test-pkce.js' },
   { name: 'audit-log.js (Layer 5 哈希链审计)', file: 'test-audit-log.js' },
+  { name: 'audit-concurrency.js (哈希链并发不断链)', file: 'test-audit-concurrency.js' },
   { name: 'tamper-check.js (Layer 5 篡改校验)', file: 'test-tamper-check.js' },
   { name: 'replay-guard.js (Layer 4 重放防护)', file: 'test-replay-guard.js' },
   { name: 'rate-limiter.js (Layer 4 限流+异常检测)', file: 'test-rate-limiter.js' },
